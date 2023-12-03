@@ -1,0 +1,57 @@
+(defun parse-cube-set (cube-set-string)
+  (let ((color-regexes '((red . "(\\d+) red")
+                         (green . "(\\d+) green")
+                         (blue . "(\\d+) blue"))))
+    (mapcar (lambda (regex)
+              (or (find-color-count (cdr regex) cube-set-string) 0))
+        color-regexes)))
+
+(defun find-color-count (color-regex cube-set-string)
+  (multiple-value-bind (_ register-matches)
+      (ppcre:scan-to-strings color-regex cube-set-string)
+    (declare (ignore _))
+    (when register-matches
+          (parse-integer (aref register-matches 0)))))
+
+(defun parse-game-record (record)
+  (let* ((split-record (str::split ":" record))
+         (game-id-parts (str::split " " (first split-record)))
+         (id (parse-integer (second game-id-parts)))
+         (sets (str::split ";" (second split-record))))
+    (values id (mapcar #'parse-cube-set sets))))
+
+(defun game-possible-p (game-cube-sets)
+  (every (lambda (cube-set)
+           (let ((max-red 12) (max-green 13) (max-blue 14))
+             (and (<= (first cube-set) max-red)
+                  (<= (second cube-set) max-green)
+                  (<= (third cube-set) max-blue))))
+      game-cube-sets))
+
+(defun sum-possible-game-ids (filename)
+  (let ((lines (uiop:read-file-lines filename)))
+    (reduce (lambda (acc line)
+              (+ acc (multiple-value-bind (id cube-sets) (parse-game-record line)
+                       (if (game-possible-p cube-sets) id 0))))
+        lines
+      :initial-value 0)))
+
+(defun find-minimum-cubes-for-game (cube-sets)
+  (let ((max-red 0) (max-green 0) (max-blue 0))
+    (dolist (set cube-sets)
+      (setf max-red (max max-red (first set))
+        max-green (max max-green (second set))
+        max-blue (max max-blue (third set))))
+    (list max-red max-green max-blue)))
+
+(defun calculate-power (cube-set)
+  (apply #'* cube-set))
+
+(defun sum-of-powers (filename)
+  (let ((lines (uiop:read-file-lines filename)))
+    (reduce (lambda (acc line)
+              (+ acc (multiple-value-bind (_ cube-sets) (parse-game-record line)
+                       (declare (ignore _))
+                       (calculate-power (find-minimum-cubes-for-game cube-sets)))))
+        lines
+      :initial-value 0)))
